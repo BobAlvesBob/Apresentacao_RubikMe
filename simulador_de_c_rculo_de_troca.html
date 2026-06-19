@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RubikMe - Simulador de Círculos Multilaterais de 5 Vias</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* DESIGN TOKENS & BRAND PALETTE */
+        :root {
+            --bg-purple: #532982;
+            --dark-card: #393B41;
+            --accent-pink: #EE1379;
+            --accent-blue: #42D2FF;
+            --accent-yellow: #FDE614;
+            --white: #FFFFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #1e1b2e;
+            font-family: 'Urbanist', sans-serif;
+            color: var(--white);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        /* CONTAINER PRINCIPAL (GLASSMORPHISM) */
+        .app-container {
+            background-color: var(--bg-purple);
+            width: 1050px;
+            height: 680px;
+            border-radius: 24px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* DECORAÇÃO DE FUNDO */
+        .app-container::before {
+            content: '';
+            position: absolute;
+            top: -20%;
+            right: -20%;
+            width: 300px;
+            height: 300px;
+            background: var(--accent-pink);
+            filter: blur(80px);
+            opacity: 0.3;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        /* PAINEL LATERAL ESQUERDO (CONTROLOS) */
+        .control-panel {
+            background-color: rgba(57, 59, 65, 0.95);
+            padding: 40px 30px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 2;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 5px;
+        }
+
+        .header h1 span {
+            color: var(--accent-pink);
+        }
+
+        .step-info {
+            margin: 30px 0;
+            flex-grow: 1;
+        }
+
+        .step-title {
+            color: var(--accent-yellow);
+            font-size: 18px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .step-desc {
+            font-size: 15px;
+            line-height: 1.45;
+            color: #cbd5e1;
+            min-height: 150px;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn {
+            background-color: transparent;
+            border: 2px solid var(--accent-blue);
+            color: var(--white);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn:hover {
+            background-color: var(--accent-blue);
+            color: var(--bg-purple);
+            box-shadow: 0 0 15px rgba(66, 210, 255, 0.4);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-pink);
+            border-color: var(--accent-pink);
+        }
+
+        .btn-primary:hover {
+            background-color: #d1106a;
+            border-color: #d1106a;
+            color: var(--white);
+            box-shadow: 0 0 15px rgba(238, 19, 121, 0.4);
+        }
+
+        /* PAINEL DA ANIMAÇÃO (DIREITO) */
+        .animation-sandbox {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 20px;
+        }
+
+        /* PALCO SVG */
+        .svg-canvas {
+            width: 100%;
+            height: 100%;
+            max-width: 550px;
+            max-height: 550px;
+        }
+
+        /* ESTILOS DOS NÓS (PESSOAS) */
+        .node-circle {
+            fill: var(--dark-card);
+            stroke: rgba(255, 255, 255, 0.2);
+            stroke-width: 3;
+            transition: all 0.5s ease;
+        }
+
+        .node-active {
+            stroke: var(--accent-yellow);
+            filter: drop-shadow(0 0 8px var(--accent-yellow));
+        }
+
+        .node-text {
+            font-family: 'Urbanist', sans-serif;
+            font-weight: 800;
+            font-size: 13px;
+            fill: var(--white);
+            text-anchor: middle;
+        }
+
+        .node-subtext {
+            font-family: 'Urbanist', sans-serif;
+            font-size: 10px;
+            fill: var(--accent-blue);
+            text-anchor: middle;
+            font-weight: 600;
+        }
+
+        /* LINHAS DE LIGAÇÃO EM ARCO EXTERNO */
+        .flow-line {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.08);
+            stroke-width: 3;
+            stroke-dasharray: 6, 6;
+            transition: stroke 0.5s ease, stroke-width 0.5s ease;
+        }
+
+        .flow-line-active {
+            stroke: var(--accent-blue);
+            stroke-dasharray: 0;
+            animation: pulse-line 1.5s infinite;
+        }
+
+        /* ITEMS EM TRÂNSITO (ÓRBITA EXTERNA) */
+        .item-sprite {
+            font-size: 28px;
+            user-select: none;
+            pointer-events: none;
+            dominant-baseline: middle;
+            text-anchor: middle;
+        }
+
+        /* ESTILO DO CRONÓMETRO/STATUS */
+        .status-pill {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background-color: rgba(57, 59, 65, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-yellow);
+            animation: blink 1s infinite alternate;
+        }
+
+        /* ANIMAÇÕES CSS */
+        @keyframes blink {
+            from { opacity: 0.3; }
+            to { opacity: 1; }
+        }
+
+        @keyframes pulse-line {
+            0% { stroke-opacity: 0.8; }
+            50% { stroke-opacity: 1; stroke-width: 4.5; }
+            100% { stroke-opacity: 0.8; }
+        }
+
+        /* TEXTO DE AJUDA DO PITCH */
+        .pitch-cue-card {
+            margin-top: 25px;
+            background: rgba(57, 59, 65, 0.5);
+            padding: 15px;
+            border-radius: 12px;
+            border-left: 4px solid var(--accent-yellow);
+            max-width: 1050px;
+            font-size: 14px;
+            color: #cbd5e1;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- PAINEL DE CONTROLO ESQUERDO -->
+        <div class="control-panel">
+            <div class="header">
+                <svg width="45" height="45" viewBox="0 0 100 100" style="margin-bottom: 10px;">
+                    <polygon points="50,10 90,30 90,70 50,90 10,70 10,30" fill="#EE1379" stroke="#393B41" stroke-width="4"/>
+                    <polygon points="50,10 90,30 50,50 10,30" fill="#42D2FF" stroke="#393B41" stroke-width="2"/>
+                    <rect x="42" y="38" width="16" height="16" fill="#FDE614" transform="rotate(45 50 46)"/>
+                </svg>
+                <h1>Rubik<span>Me</span></h1>
+                <p style="font-size: 13px; opacity: 0.7; text-transform: uppercase;">Simulador de Grafos 5-Vias</p>
+            </div>
+
+            <!-- Informações das Etapas de Troca -->
+            <div class="step-info">
+                <div class="step-title" id="step-title">Etapa 1: Estado Inicial</div>
+                <div class="step-desc" id="step-desc">Cada utilizador adiciona à plataforma o item de que se quer desapegar (o seu capital morto) e configura os seus desejos. Não há nenhuma correspondência direta viável.</div>
+            </div>
+
+            <!-- Botões Operacionais -->
+            <div class="action-buttons">
+                <button class="btn btn-primary" id="btn-next" onclick="nextStage()">
+                    <span>Avançar Etapa</span> <i class="fa-solid fa-arrow-right"></i>
+                </button>
+                <button class="btn" id="btn-play" onclick="toggleAutoPlay()">
+                    <i class="fa-solid fa-play"></i> <span>Auto Loop</span>
+                </button>
+                <button class="btn" onclick="resetSimulator()">
+                    <i class="fa-solid fa-rotate-left"></i> <span>Reiniciar</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- PALCO DA ANIMAÇÃO DIREITO -->
+        <div class="animation-sandbox">
+            <div class="status-pill">
+                <span class="status-dot"></span>
+                <span id="status-text">MOTOR DFS: INATIVO</span>
+            </div>
+
+            <svg class="svg-canvas" viewBox="0 0 400 400" id="svg-stage">
+                <!-- Definição de Marcadores para as Setas -->
+                <defs>
+                    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#42D2FF" />
+                    </marker>
+                    <marker id="arrow-inactive" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(255,255,255,0.15)" />
+                    </marker>
+                </defs>
+
+                <!-- ÓRBITAS DE REFERÊNCIA -->
+                <!-- Órbita Externa (Fluxo dos Items) -->
+                <circle cx="200" cy="200" r="150" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1.5" stroke-dasharray="4,4"/>
+                <!-- Órbita Interna (Alinhamento dos Utilizadores) -->
+                <circle cx="200" cy="200" r="105" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="1"/>
+
+                <!-- NÓ ANA -->
+                <g id="node-0" class="node">
+                    <circle class="node-circle" cx="200" cy="95" r="30" />
+                    <text class="node-text" x="200" y="91">Ana</text>
+                    <text class="node-subtext" x="200" y="108" id="sub-0">Tem: Casaco</text>
+                </g>
+
+                <!-- NÓ BRUNO -->
+                <g id="node-1" class="node">
+                    <circle class="node-circle" cx="300" cy="168" r="30" />
+                    <text class="node-text" x="300" y="164">Bruno</text>
+                    <text class="node-subtext" x="300" y="181" id="sub-1">Tem: Consola</text>
+                </g>
+
+                <!-- NÓ CARLOS -->
+                <g id="node-2" class="node">
+                    <circle class="node-circle" cx="262" cy="285" r="30" />
+                    <text class="node-text" x="262" y="281">Carlos</text>
+                    <text class="node-subtext" x="262" y="298" id="sub-2">Tem: Tablet</text>
+                </g>
+
+                <!-- NÓ DIANA -->
+                <g id="node-3" class="node">
+                    <circle class="node-circle" cx="138" cy="285" r="30" />
+                    <text class="node-text" x="138" y="281">Diana</text>
+                    <text class="node-subtext" x="138" y="298" id="sub-3">Tem: Bicicleta</text>
+                </g>
+
+                <!-- NÓ EDUARDO -->
+                <g id="node-4" class="node">
+                    <circle class="node-circle" cx="100" cy="168" r="30" />
+                    <text class="node-text" x="100" y="164">Eduardo</text>
+                    <text class="node-subtext" x="100" y="181" id="sub-4">Tem: Livro</text>
+                </g>
+
+                <!-- ITENS EM CIRCULAÇÃO (ESTRUTURADOS NA ÓRBITA EXTERNA) -->
+                <text id="item-0" class="item-sprite" x="200" y="50">🧥</text>
+                <text id="item-1" class="item-sprite" x="343" y="154">🎮</text>
+                <text id="item-2" class="item-sprite" x="288" y="321">📱</text>
+                <text id="item-3" class="item-sprite" x="112" y="321">🚲</text>
+                <text id="item-4" class="item-sprite" x="57" y="154">📚</text>
+            </svg>
+        </div>
+    </div>
+
+    <!-- NOTA DE SUPORTE AO PITCH -->
+    <div class="pitch-cue-card">
+        <strong>💡 Dica para o teu Pitch no Poliempreende (5 Vias):</strong> 
+        "Enquanto os mercados tradicionais falham pela falta de interesse direto, o RubikMe usa estruturas de grafos para encontrar caminhos longos de troca. Aqui, a Ana passa o Casaco ao Bruno, que passa a Consola ao Carlos, que passa o Tablet à Diana, que passa a Bicicleta ao Eduardo, que finalmente entrega o Livro à Ana. Todos saem satisfeitos a custo fiduciário zero."
+    </div>
+
+    <script>
+        // ESTADOS DA ANIMAÇÃO
+        let currentStage = 0;
+        let autoPlayInterval = null;
+        let isAutoPlaying = false;
+        let animationFrameId = null;
+        let animStartTime = null;
+        const animDuration = 2500; // 2.5 segundos de pura suavidade circular
+
+        // Parâmetros da Órbita
+        const cx = 200;
+        const cy = 200;
+        const rPeople = 105; // Órbita interna dos utilizadores
+        const rItems = 150;  // Órbita externa dos itens de troca
+
+        // Ângulos exatos dos 5 integrantes distribuidos na circunferência (em Radianos)
+        const angles = [
+            -Math.PI / 2,                  // Ana (0)
+            -Math.PI / 2 + (1 * 2 * Math.PI / 5), // Bruno (1)
+            -Math.PI / 2 + (2 * 2 * Math.PI / 5), // Carlos (2)
+            -Math.PI / 2 + (3 * 2 * Math.PI / 5), // Diana (3)
+            -Math.PI / 2 + (4 * 2 * Math.PI / 5)  // Eduardo (4)
+        ];
+
+        const itemEmojis = ["🧥", "🎮", "📱", "🚲", "📚"];
+        const originalOwners = ["Ana", "Bruno", "Carlos", "Diana", "Eduardo"];
+        const itemNames = ["Casaco", "Consola", "Tablet", "Bicicleta", "Livro"];
+
+        const stageData = [
+            {
+                title: "Etapa 1: Estado Inicial",
+                desc: "Cinco utilizadores registam as suas necessidades. A Ana quer o Livro do Eduardo, mas este quer a Bicicleta da Diana, que quer o Tablet do Carlos, que por sua vez cobiça a Consola do Bruno, que quer o Casaco da Ana. Nenhuma troca direta (bilateral) é viável.",
+                status: "MOTOR DFS: INATIVO",
+                statusColor: "var(--accent-pink)"
+            },
+            {
+                title: "Etapa 2: Mapeamento em Grafo",
+                desc: "O algoritmo de busca profunda (DFS) do RubikMe varre os nós no Neo4j e deteta instantaneamente um anel fechado perfeito de 5 caminhos. As conexões são ativadas em milissegundos.",
+                status: "ANEL ENCONTRADO (DFS 5-Vias)",
+                statusColor: "var(--accent-yellow)"
+            },
+            {
+                title: "Etapa 3: Transição Curva Logística",
+                desc: "Segurança validada! Os artigos entram em trânsito sincronizado pela órbita de segurança exterior, viajando diretamente entre utilizadores sem comprometer o fluxo visual.",
+                status: "LOGÍSTICA EM CURSO (7% TAXA)",
+                statusColor: "var(--accent-blue)"
+            },
+            {
+                title: "Etapa 4: Círculo Concluído",
+                desc: "Sucesso operacional! Todos os 5 utilizadores receberam os itens desejados sem qualquer intervenção de dinheiro pelo produto. O capital morto foi totalmente convertido.",
+                status: "ANEL CONCLUÍDO - 100% SUCESSO",
+                statusColor: "var(--accent-blue)"
+            }
+        ];
+
+        // Atualizar os caminhos dinamicamente no início sobre a órbita de 150px (rItems)
+        function setupPaths() {
+            const svg = document.getElementById("svg-stage");
+            
+            // Remover caminhos estáticos antigos
+            document.querySelectorAll(".flow-line").forEach(el => el.remove());
+
+            // Gerar arcos dinâmicos precisos para os 5 caminhos do anel
+            for (let i = 0; i < 5; i++) {
+                const next = (i + 1) % 5;
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute("id", `line-${i}`);
+                path.setAttribute("class", "flow-line");
+                
+                // Calculo de início e fim com pequeno recuo para não sobrepor o círculo do utilizador
+                const startAng = angles[i] + 0.08;
+                const endAng = angles[next] - 0.08;
+
+                const x1 = cx + rItems * Math.cos(startAng);
+                const y1 = cy + rItems * Math.sin(startAng);
+                const x2 = cx + rItems * Math.cos(endAng);
+                const y2 = cy + rItems * Math.sin(endAng);
+
+                // Caminho em formato de arco (A rx ry x-axis-rotation large-arc-flag sweep-flag x y)
+                path.setAttribute("d", `M ${x1} ${y1} A ${rItems} ${rItems} 0 0 1 ${x2} ${y2}`);
+                path.setAttribute("marker-end", "url(#arrow-inactive)");
+                svg.appendChild(path);
+            }
+        }
+
+        // Interpolação suave de aceleração e desaceleração (Easing)
+        function easeInOutQuad(t) {
+            return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+        }
+
+        // Animação de transição circular dos itens seguindo a órbita externa (rItems = 150)
+        function animateTransit(timestamp) {
+            if (!animStartTime) animStartTime = timestamp;
+            let progress = (timestamp - animStartTime) / animDuration;
+            if (progress > 1) progress = 1;
+
+            const easedProgress = easeInOutQuad(progress);
+
+            for (let i = 0; i < 5; i++) {
+                const itemEl = document.getElementById(`item-${i}`);
+                const startAngle = angles[i];
+                let endAngle = angles[(i + 1) % 5];
+
+                // Forçar a rotação no sentido horário caso o ângulo final seja menor
+                if (endAngle < startAngle) {
+                    endAngle += 2 * Math.PI;
+                }
+
+                // Calcular ângulo atual
+                const currentAngle = startAngle + (endAngle - startAngle) * easedProgress;
+
+                // Definir novas coordenadas cartesianas na órbita exterior
+                const px = cx + rItems * Math.cos(currentAngle);
+                const py = cy + rItems * Math.sin(currentAngle);
+
+                itemEl.setAttribute("x", px);
+                itemEl.setAttribute("y", py);
+            }
+
+            if (progress < 1 && currentStage === 2) {
+                animationFrameId = requestAnimationFrame(animateTransit);
+            } else if (progress === 1) {
+                // Ao terminar a transição, avança automaticamente para a etapa final
+                currentStage = 3;
+                animStartTime = null;
+                updateStageView();
+            }
+        }
+
+        function updateStageView() {
+            // Cancelar qualquer animação ativa para evitar conflitos de transições
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+
+            const data = stageData[currentStage];
+            document.getElementById("step-title").innerText = data.title;
+            document.getElementById("step-desc").innerText = data.desc;
+            document.getElementById("status-text").innerText = data.status;
+            document.querySelector(".status-dot").style.backgroundColor = data.statusColor;
+
+            const nextBtn = document.getElementById("btn-next");
+            if (currentStage === 3) {
+                nextBtn.innerHTML = `<span>Reiniciar Anel</span> <i class="fa-solid fa-rotate"></i>`;
+            } else {
+                nextBtn.innerHTML = `<span>Avançar Etapa</span> <i class="fa-solid fa-arrow-right"></i>`;
+            }
+
+            // Atualização dos estados visuais dos caminhos e nós
+            for (let i = 0; i < 5; i++) {
+                const nodeCircle = document.getElementById(`node-${i}`).querySelector("circle");
+                const line = document.getElementById(`line-${i}`);
+                const itemEl = document.getElementById(`item-${i}`);
+                const subText = document.getElementById(`sub-${i}`);
+
+                // Reset das classes ativas
+                nodeCircle.classList.remove("node-active");
+                if (line) {
+                    line.classList.remove("flow-line-active");
+                    line.setAttribute("marker-end", "url(#arrow-inactive)");
+                }
+
+                if (currentStage === 0) {
+                    // Itens parados nos donos iniciais (na órbita exterior de 150px)
+                    const px = cx + rItems * Math.cos(angles[i]);
+                    const py = cy + rItems * Math.sin(angles[i]);
+                    itemEl.setAttribute("x", px);
+                    itemEl.setAttribute("y", py);
+
+                    subText.innerText = `Tem: ${itemNames[i]}`;
+                    subText.style.fill = "var(--accent-blue)";
+                } 
+                else if (currentStage === 1) {
+                    // Deteção ativada (Caminhos acendem e piscam)
+                    nodeCircle.classList.add("node-active");
+                    if (line) {
+                        line.classList.add("flow-line-active");
+                        line.setAttribute("marker-end", "url(#arrow)");
+                    }
+                } 
+                else if (currentStage === 2) {
+                    // Iniciar a animação de trânsito ao longo da curva
+                    if (line) {
+                        line.classList.add("flow-line-active");
+                        line.setAttribute("marker-end", "url(#arrow)");
+                    }
+                } 
+                else if (currentStage === 3) {
+                    // Itens entregues aos novos donos na órbita exterior
+                    nodeCircle.classList.add("node-active");
+                    const next = (i + 1) % 5;
+                    const px = cx + rItems * Math.cos(angles[next]);
+                    const py = cy + rItems * Math.sin(angles[next]);
+                    itemEl.setAttribute("x", px);
+                    itemEl.setAttribute("y", py);
+
+                    // Atualizar descrição para mostrar o que cada um adquiriu
+                    subText.innerText = `Adquiriu: ${itemNames[(i - 1 + 5) % 5]} ✓`;
+                    subText.style.fill = "var(--accent-yellow)";
+                }
+            }
+
+            // Ativa o gatilho de animação curva quando entramos no Stage 2
+            if (currentStage === 2) {
+                animStartTime = null;
+                animationFrameId = requestAnimationFrame(animateTransit);
+            }
+        }
+
+        function nextStage() {
+            if (currentStage === 3) {
+                currentStage = 0;
+            } else {
+                currentStage++;
+            }
+            updateStageView();
+        }
+
+        function toggleAutoPlay() {
+            const playBtn = document.getElementById("btn-play");
+            if (isAutoPlaying) {
+                clearInterval(autoPlayInterval);
+                playBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span>Auto Loop</span>`;
+                isAutoPlaying = false;
+            } else {
+                // Loop inteligente transitando de etapa a cada 3.5 segundos
+                autoPlayInterval = setInterval(() => {
+                    nextStage();
+                }, 3800);
+                playBtn.innerHTML = `<i class="fa-solid fa-pause"></i> <span>Pausar</span>`;
+                isAutoPlaying = true;
+                nextStage();
+            }
+        }
+
+        function resetSimulator() {
+            currentStage = 0;
+            if (isAutoPlaying) {
+                toggleAutoPlay();
+            }
+            animStartTime = null;
+            updateStageView();
+        }
+
+        // Executar inicializações no arranque da janela
+        window.onload = function() {
+            setupPaths();
+            updateStageView();
+        }
+    </script>
+</body>
+</html>
